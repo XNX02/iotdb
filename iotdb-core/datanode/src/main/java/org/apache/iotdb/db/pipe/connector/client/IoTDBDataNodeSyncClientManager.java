@@ -27,12 +27,14 @@ import org.apache.iotdb.commons.pipe.connector.payload.thrift.request.PipeTransf
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.pipe.connector.payload.evolvable.request.PipeTransferDataNodeHandshakeV1Req;
 import org.apache.iotdb.db.pipe.connector.payload.evolvable.request.PipeTransferDataNodeHandshakeV2Req;
+import org.apache.iotdb.pipe.api.exception.PipeConnectionException;
 
 import org.apache.tsfile.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -56,7 +58,8 @@ public class IoTDBDataNodeSyncClientManager extends IoTDBSyncClientManager
       final boolean shouldReceiverConvertOnTypeMismatch,
       final String loadTsFileStrategy,
       final boolean validateTsFile,
-      final boolean shouldMarkAsPipeRequest) {
+      final boolean shouldMarkAsPipeRequest,
+      final boolean shouldConnectToAllEndPoints) {
     super(
         endPoints,
         useSSL,
@@ -69,7 +72,8 @@ public class IoTDBDataNodeSyncClientManager extends IoTDBSyncClientManager
         shouldReceiverConvertOnTypeMismatch,
         loadTsFileStrategy,
         validateTsFile,
-        shouldMarkAsPipeRequest);
+        shouldMarkAsPipeRequest,
+        shouldConnectToAllEndPoints);
   }
 
   @Override
@@ -106,6 +110,17 @@ public class IoTDBDataNodeSyncClientManager extends IoTDBSyncClientManager
             && Boolean.TRUE.equals(endPoint2ClientAndStatus.get(endPoint).getRight())
         ? endPoint2ClientAndStatus.get(endPoint)
         : getClient();
+  }
+
+  public List<Pair<IoTDBSyncClient, Boolean>> getAllClients() {
+    for (final TEndPoint endPoint : endPointList) {
+      final Pair<IoTDBSyncClient, Boolean> clientAndStatus = endPoint2ClientAndStatus.get(endPoint);
+      if (Boolean.FALSE.equals(clientAndStatus.getRight())) {
+        throw new PipeConnectionException(
+            "Some clients are dead, please check the connection to the receiver.");
+      }
+    }
+    return new ArrayList<>(endPoint2ClientAndStatus.values());
   }
 
   public void updateLeaderCache(final String deviceId, final TEndPoint endPoint) {

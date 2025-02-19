@@ -23,6 +23,7 @@ import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.commons.client.ClientPoolFactory;
 import org.apache.iotdb.commons.client.IClientManager;
 import org.apache.iotdb.commons.client.async.AsyncPipeDataTransferServiceClient;
+import org.apache.iotdb.commons.client.exception.ClientManagerException;
 import org.apache.iotdb.commons.conf.CommonDescriptor;
 import org.apache.iotdb.commons.pipe.config.PipeConfig;
 import org.apache.iotdb.commons.pipe.connector.client.IoTDBClientManager;
@@ -39,13 +40,7 @@ import org.apache.thrift.async.AsyncMethodCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -170,6 +165,22 @@ public class IoTDBDataNodeAsyncClientManager extends IoTDBClientManager
 
     return borrowClient();
   }
+
+  public List<AsyncPipeDataTransferServiceClient> borrowAllClients() throws Exception {
+    final List<AsyncPipeDataTransferServiceClient> clients = new ArrayList<>();
+    for (final TEndPoint targetNodeUrl : endPointList) {
+      final AsyncPipeDataTransferServiceClient client = endPoint2Client.borrowClient(targetNodeUrl);
+      if (handshakeIfNecessary(targetNodeUrl, client)) {
+        clients.add(client);
+      }else if(client.isHandshakeFinished()){
+          clients.add(client);
+      }else{
+        throw new PipeConnectionException("Some clients are dead, please check the connection to the receiver.");
+      }
+    }
+    return clients;
+  }
+
 
   /**
    * Handshake with the target if necessary.

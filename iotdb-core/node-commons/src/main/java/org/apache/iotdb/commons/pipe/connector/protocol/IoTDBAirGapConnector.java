@@ -152,6 +152,7 @@ public abstract class IoTDBAirGapConnector extends IoTDBConnector {
   @Override
   @SuppressWarnings("java:S2095")
   public void handshake() throws Exception {
+    List<TEndPoint> failedNodeUrls = new ArrayList<>();
     for (int i = 0; i < sockets.size(); i++) {
       if (Boolean.TRUE.equals(isSocketAlive.get(i))) {
         continue;
@@ -196,16 +197,32 @@ public abstract class IoTDBAirGapConnector extends IoTDBConnector {
         LOGGER.warn(
             "Handshake error occurs. It may be caused by an error on the receiving end. Ignore it.",
             e);
+        failedNodeUrls.add(nodeUrls.get(i));
       }
     }
-
-    for (int i = 0; i < sockets.size(); i++) {
-      if (Boolean.TRUE.equals(isSocketAlive.get(i))) {
+    if (shouldConnectToAllEndPoints) {
+      boolean allAlive = true;
+      for (int i = 0; i < sockets.size(); i++) {
+        if (Boolean.FALSE.equals(isSocketAlive.get(i))) {
+          allAlive = false;
+          break;
+        }
+      }
+      if (allAlive) {
         return;
       }
+    } else {
+      for (int i = 0; i < sockets.size(); i++) {
+        if (Boolean.TRUE.equals(isSocketAlive.get(i))) {
+          return;
+        }
+      }
     }
-    throw new PipeConnectionException(
-        String.format("All target servers %s are not available.", nodeUrls));
+    throw shouldConnectToAllEndPoints
+        ? new PipeConnectionException(
+            String.format("All target servers %s are not available.", nodeUrls))
+        : new PipeConnectionException(
+            String.format("Some target servers %s are not available.", failedNodeUrls));
   }
 
   protected void sendHandshakeReq(final AirGapSocket socket) throws IOException {
