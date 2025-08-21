@@ -115,7 +115,6 @@ public class MQTTPublishHandler extends AbstractInterceptHandler {
           TSProtocolVersion.IOTDB_SERVICE_PROTOCOL_V3,
           ClientVersion.V_1_0,
           useTableInsert ? IClientSession.SqlDialect.TABLE : IClientSession.SqlDialect.TREE);
-      sessionManager.registerSession(session);
       sessionManager.registerSessionForMqtt(session);
       clientIdToSessionMap.put(msg.getClientID(), session);
     }
